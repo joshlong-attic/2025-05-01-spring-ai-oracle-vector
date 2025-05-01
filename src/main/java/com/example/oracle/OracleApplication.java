@@ -2,28 +2,19 @@ package com.example.oracle;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import oracle.jdbc.OracleType;
 import oracle.jdbc.driver.OracleDriver;
 import oracle.sql.VECTOR;
-
+import oracle.ucp.jdbc.PoolDataSource;
+import oracle.ucp.jdbc.PoolDataSourceFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.repository.ListCrudRepository;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.stereotype.Controller;
-
 
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @SpringBootApplication
 public class OracleApplication {
@@ -42,8 +33,53 @@ public class OracleApplication {
     }
 
 
-    @Bean
-    DataSource hikari(
+    DataSource better(@Value("${spring.datasource.url}") String url,
+                      @Value("${spring.datasource.username}") String username,
+                      @Value("${spring.datasource.password}") String pw) throws Exception {
+
+
+        String DB_URL = url; // "jdbc:oracle:thin:@myhost:1521/orclservicename";
+        String DB_USER = username;
+        String DB_PASSWORD = pw;
+        String CONN_FACTORY_CLASS_NAME = "oracle.jdbc.pool.OracleDataSource";
+
+        // Get the PoolDataSource for UCP
+        PoolDataSource pds = PoolDataSourceFactory.getPoolDataSource();
+
+        // Set the connection factory first before all other properties
+        pds.setConnectionFactoryClassName(CONN_FACTORY_CLASS_NAME);
+        pds.setURL(DB_URL);
+        pds.setUser(DB_USER);
+        pds.setPassword(DB_PASSWORD);
+        pds.setConnectionPoolName("JDBC_UCP_POOL");
+        pds.setConnectionProperty("oracle.jdbc.vectorDefaultGetObjectType", "int[]");
+        // Default is 0. Set the initial number of connections to be created
+        // when UCP is started.
+        pds.setInitialPoolSize(5);
+
+        // Default is 0. Set the minimum number of connections
+        // that is maintained by UCP at runtime.
+        pds.setMinPoolSize(5);
+
+        // Default is Integer.MAX_VALUE (2147483647). Set the maximum number of
+        // connections allowed on the connection pool.
+        pds.setMaxPoolSize(20);
+
+        // Default is 30secs. Set the frequency in seconds to enforce the timeout
+        // properties. Applies to inactiveConnectionTimeout(int secs),
+        // AbandonedConnectionTimeout(secs)& TimeToLiveConnectionTimeout(int secs).
+        // Range of valid values is 0 to Integer.MAX_VALUE. .
+        pds.setTimeoutCheckInterval(5);
+
+        // Default is 0. Set the maximum time, in seconds, that a
+        // connection remains available in the connection pool.
+        pds.setInactiveConnectionTimeout(10);
+
+        return pds;
+    }
+
+    //@Bean
+    DataSource pool(
             @Value("${spring.datasource.url}") String url,
             @Value("${spring.datasource.username}") String username,
             @Value("${spring.datasource.password}") String pw
@@ -59,51 +95,60 @@ public class OracleApplication {
     }
 
     @Bean
-    ApplicationRunner vectorFun(JdbcClient jdbcClient,
-                                @Value("${spring.datasource.url}") String url,
-                                @Value("${spring.datasource.username}") String username,
-                                @Value("${spring.datasource.password}") String pw
-            /*      JdbcClient db, EmbeddingModel embeddingModel*/) {
+    ApplicationRunner vectorFun(
+            JdbcClient jdbcClient,
+            @Value("${spring.datasource.url}") String url,
+            @Value("${spring.datasource.username}") String username,
+            @Value("${spring.datasource.password}") String pw
+    ) {
         return args -> {
-            var ds = hikari(url, username, pw);
-
-            jdbcClient.sql("""
+            var ds = better(url, username, pw);
+            jdbcClient
+                    .sql("""
                                 create table if not exists m_test (
-                                    embedding vector(3,FLOAT64)
-                                ) 
+                                    id number(10) primary key,
+                                    embedding vector(3, INT8 )
+                                )   
+                            
                             """)
                     .update();
-
-//            var embedding = embeddingModel.embed("Pooch Palace");
-             insertVectorWithBatchAPI(ds.getConnection());
-/*
-
-            var vector = toVECTOR(f);
-            try (var conn = ds.getConnection()) {
-                try (var ps = conn.prepareStatement("insert into m_test( embedding ) values (?)")) {
-                    ps.setObject(1, vector, OracleType.VECTOR_FLOAT64);
-                    ps.executeUpdate();
-                }
-            }*/
-
+            jdbcClient.sql(" delete from m_test ").update();
+            System.out.println("there are " + jdbcClient.sql("select count(*) from m_test ").query(Integer.class).single() + " rows.");
+            this.doInsert(ds.getConnection());
             System.out.println("written!");
-
         };
     }
 
-    private void insertVectorWithBatchAPI(Connection connection) throws SQLException {
-        String insertSql = "INSERT INTO M_TEST (EMBEDDING) VALUES (  ?)";
 
-        float[][] vectors = {{1.1f, 2.2f, 3.3f}, {1.3f, 7.2f, 4.3f}, {5.9f, 5.2f, 7.3f}};
-        System.out.println("SQL DML: " + insertSql);
-        System.out.println("VECTORs to be inserted as a batch: " + Arrays.toString(vectors[0]) + ", "
-                + Arrays.toString(vectors[1]) + ", " + Arrays.toString(vectors[2]));
-        try (PreparedStatement insertStatement = connection.prepareStatement(insertSql)) {
-            for (float[] vector : vectors) {
-                insertStatement.setObject(1, vector, OracleType.VECTOR_FLOAT64);
-                insertStatement.addBatch();
+    private String vectorString(int[] vector) {
+        var sb = new StringBuilder();
+        sb.append("[");
+        for (var i = 0; i < vector.length; i++) {
+            sb.append(vector[i]);
+            if (i < vector.length - 1) {
+                sb.append(",");
             }
-            insertStatement.executeBatch();
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    private void doInsert(java.sql.Connection connection) throws SQLException {
+        var ctr = 0;
+        var insertSql = "INSERT INTO M_TEST(ID,EMBEDDING) VALUES( ?, ?)";
+        var vectors = new int[][]{{1, 2, 3}, {1, 7, 4}, {5, 5, 7}};
+        try (var statement = connection.createStatement()) {
+            for (var vector : vectors) {
+                var sql = "   insert into m_test (id, embedding) values ( " + (ctr++) + ", " + vectorString(vector) + ")";
+                System.out.println("sql: " + sql);
+                statement.executeUpdate(sql);
+            }
+//            for (var vector : vectors) {
+//                statement.setInt(1, ctr++);
+//                statement.setObject(2, VECTOR.ofInt8Values(vector), OracleType.VECTOR);
+//                statement.executeUpdate();
+//            }
+//            insertStatement.executeBatch();
         }
     }
 

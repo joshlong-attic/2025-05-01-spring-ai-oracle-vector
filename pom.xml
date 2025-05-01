@@ -32,51 +32,52 @@
         <oracle-database.version>23.7.0.25.01</oracle-database.version>
     </properties>
     <dependencies>
-     <!--   <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>-->
-<!--        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-starter-model-openai</artifactId>
-        </dependency>-->
-       <!-- <dependency>
-            <groupId>com.oracle.database.ha</groupId>
-            <artifactId>simplefan</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.oracle.database.jdbc</groupId>
-            <artifactId>ojdbc17</artifactId>
-            <version>${oracle-database.version}</version>
-        </dependency>-->
-       <!-- <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-starter-vector-store-oracle</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>com.oracle.database.jdbc</groupId>
-                    <artifactId>ojdbc11</artifactId>
+        <!--   <dependency>
+               <groupId>org.springframework.boot</groupId>
+               <artifactId>spring-boot-starter-web</artifactId>
+           </dependency>-->
+        <!--        <dependency>
+                    <groupId>org.springframework.ai</groupId>
+                    <artifactId>spring-ai-starter-model-openai</artifactId>
+                </dependency>-->
+        <!-- <dependency>
+             <groupId>com.oracle.database.ha</groupId>
+             <artifactId>simplefan</artifactId>
+         </dependency>
+         <dependency>
+             <groupId>com.oracle.database.jdbc</groupId>
+             <artifactId>ojdbc17</artifactId>
+             <version>${oracle-database.version}</version>
+         </dependency>-->
+        <!-- <dependency>
+             <groupId>org.springframework.ai</groupId>
+             <artifactId>spring-ai-starter-vector-store-oracle</artifactId>
+             <exclusions>
+                 <exclusion>
+                     <groupId>com.oracle.database.jdbc</groupId>
+                     <artifactId>ojdbc11</artifactId>
 
-                </exclusion>
-            </exclusions>
-        </dependency>-->
-<!--        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-advisors-vector-store</artifactId>
-        </dependency>-->
+                 </exclusion>
+             </exclusions>
+         </dependency>-->
+        <!--        <dependency>
+                    <groupId>org.springframework.ai</groupId>
+                    <artifactId>spring-ai-advisors-vector-store</artifactId>
+                </dependency>-->
         <!--   <dependency>
                <groupId>com.oracle.database.jdbc</groupId>
                <artifactId>ucp</artifactId>
            </dependency>
-   -->	<dependency>
-        <groupId>com.oracle.database.jdbc</groupId>
-        <artifactId>ojdbc11</artifactId>
-        <version>23.4.0.24.05</version>
-    </dependency>
+   -->
+        <dependency>
+            <groupId>com.oracle.database.jdbc</groupId>
+            <artifactId>ojdbc17</artifactId>
+            <version>${oracle-database.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.oracle.database.jdbc</groupId>
             <artifactId>ucp</artifactId>
-            <version>23.4.0.24.05</version>
+            <version>${oracle-database.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -90,18 +91,18 @@
                   </exclusion>-->
             </exclusions>
         </dependency>
-       <!-- <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-docker-compose</artifactId>
-            <scope>runtime</scope>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-spring-boot-docker-compose</artifactId>
-            <scope>runtime</scope>
-            <optional>true</optional>
-        </dependency>-->
+        <!-- <dependency>
+             <groupId>org.springframework.boot</groupId>
+             <artifactId>spring-boot-docker-compose</artifactId>
+             <scope>runtime</scope>
+             <optional>true</optional>
+         </dependency>
+         <dependency>
+             <groupId>org.springframework.ai</groupId>
+             <artifactId>spring-ai-spring-boot-docker-compose</artifactId>
+             <scope>runtime</scope>
+             <optional>true</optional>
+         </dependency>-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

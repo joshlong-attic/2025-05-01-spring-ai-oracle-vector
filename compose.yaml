@@ -1,6 +1,6 @@
 services:
   oracle:
-    image: 'gvenzl/oracle-free:23-full-arm64'
+    image: 'gvenzl/oracle-free:23.7-arm64'
     environment:
       - 'ORACLE_PASSWORD=secret'
       - 'APP_USER=test'
