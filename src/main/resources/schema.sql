@@ -1,9 +1,3 @@
-create table if not exists m_test (
-
-    embedding vector(1536,FLOAT64)
-
-);
-
 create table if not exists dog
 (
     id          integer primary key,
