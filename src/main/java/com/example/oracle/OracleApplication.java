@@ -18,8 +18,8 @@ import org.springframework.data.repository.ListCrudRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
@@ -34,16 +34,16 @@ public class OracleApplication {
 	}
 
 	@Bean
+	JdbcChatMemoryRepository jdbcChatMemoryRepository(DataSource dataSource) {
+		return JdbcChatMemoryRepository.builder().jdbcTemplate(new JdbcTemplate(dataSource)).build();
+	}
+
+	@Bean
 	MessageWindowChatMemory jdbcChatMemory(JdbcChatMemoryRepository chatMemoryRepository) {
 		return MessageWindowChatMemory.builder().chatMemoryRepository(chatMemoryRepository).build();
 	}
 
 	@Bean
-	JdbcChatMemoryRepository jdbcChatMemoryRepository(DataSource dataSource) {
-		return JdbcChatMemoryRepository.builder().jdbcTemplate(new JdbcTemplate(dataSource)).build();
-	}
-
-	// @Bean
 	ApplicationRunner dogumentInitializer(JdbcClient db, VectorStore vectorStore, DogRepository repository) {
 		return args -> {
 
@@ -66,10 +66,7 @@ class DogAssistantController {
 
 	private final ChatClient ai;
 
-	private final PromptChatMemoryAdvisor memoryAdvisor;
-
 	DogAssistantController(ChatClient.Builder ai, VectorStore vectorStore, ChatMemory chatMemory) {
-		this.memoryAdvisor = new PromptChatMemoryAdvisor(chatMemory);
 		var systemPrompt = """
 				You are an AI powered assistant to help people adopt a dog from the adoption\s
 				agency named Pooch Palace with locations in Antwerp, Seoul, Tokyo, Singapore, Paris,\s
@@ -78,15 +75,17 @@ class DogAssistantController {
 				don't have any dogs available.
 				""";
 
-		this.ai = ai.defaultSystem(systemPrompt).defaultAdvisors(new QuestionAnswerAdvisor(vectorStore)).build();
+		this.ai = ai//
+			.defaultSystem(systemPrompt) //
+			.defaultAdvisors(new QuestionAnswerAdvisor(vectorStore), new PromptChatMemoryAdvisor(chatMemory))//
+			.build();
 
 	}
 
-	@PostMapping("/{user}/inquire")
+	@GetMapping("/{user}/inquire")
 	String inquire(@PathVariable String user, @RequestParam String question) {
 		return this.ai.prompt()
-			.advisors(a -> a.advisors(this.memoryAdvisor)
-				.param(AbstractChatMemoryAdvisor.CHAT_MEMORY_CONVERSATION_ID_KEY, user))
+			.advisors(a -> a.param(AbstractChatMemoryAdvisor.CHAT_MEMORY_CONVERSATION_ID_KEY, user))
 			.user(question)
 			.call()
 			.content();
