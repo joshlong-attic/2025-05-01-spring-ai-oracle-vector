@@ -33,16 +33,16 @@ public class OracleApplication {
     public static void main(String[] args) {
         SpringApplication.run(OracleApplication.class, args);
     }
+//
+//    @Bean
+//    JdbcChatMemoryRepository jdbcChatMemoryRepository(DataSource dataSource) {
+//        return JdbcChatMemoryRepository
+//                .builder()
+//                .jdbcTemplate(new JdbcTemplate(dataSource))
+//                .build();
+//    }
 
-    @Bean
-    JdbcChatMemoryRepository jdbcChatMemoryRepository(DataSource dataSource) {
-        return JdbcChatMemoryRepository
-                .builder()
-                .jdbcTemplate(new JdbcTemplate(dataSource))
-                .build();
-    }
-
-    @Bean
+    //@Bean
     ApplicationRunner dogumentInitializer(JdbcClient db, VectorStore vectorStore, DogRepository repository) {
         return args -> {
 
@@ -64,40 +64,33 @@ public class OracleApplication {
 @ResponseBody
 class DogAssistantController {
 
-    private final String systemPrompt = """
-            You are an AI powered assistant to help people adopt a dog from the adoption\s
-            agency named Pooch Palace with locations in Antwerp, Seoul, Tokyo, Singapore, Paris,\s
-            Mumbai, New Delhi, Barcelona, San Francisco, and London. Information about the dogs available\s
-            will be presented below. If there is no information, then return a polite response suggesting we\s
-            don't have any dogs available.
-            """;
 
     private final Map<String, PromptChatMemoryAdvisor> memory = new ConcurrentHashMap<>();
 
     private final ChatClient ai;
 
-//    private final JdbcChatMemoryRepository jdbcChatMemoryRepository;
+    DogAssistantController(ChatClient.Builder ai, VectorStore vectorStore) {
+        var systemPrompt = """
+                You are an AI powered assistant to help people adopt a dog from the adoption\s
+                agency named Pooch Palace with locations in Antwerp, Seoul, Tokyo, Singapore, Paris,\s
+                Mumbai, New Delhi, Barcelona, San Francisco, and London. Information about the dogs available\s
+                will be presented below. If there is no information, then return a polite response suggesting we\s
+                don't have any dogs available.
+                """;
 
-    DogAssistantController(ChatClient.Builder ai, VectorStore vectorStore/*, JdbcChatMemoryRepository jdbcChatMemoryRepository*/) {
-//        this.jdbcChatMemoryRepository = jdbcChatMemoryRepository;
         this.ai = ai
+                .defaultSystem(systemPrompt)
                 .defaultAdvisors(new QuestionAnswerAdvisor(vectorStore))
                 .build();
 
     }
 
-
     @PostMapping("/{user}/inquire")
     String inquire(@PathVariable String user, @RequestParam String question) {
-        var memoryAdvisor = this.memory
-                .computeIfAbsent(user, x -> PromptChatMemoryAdvisor.builder(
-                                MessageWindowChatMemory.builder()
-                                        .chatMemoryRepository(new InMemoryChatMemoryRepository())
-                                        .build())
-                        .build());
+        var chatMemory = MessageWindowChatMemory.builder().chatMemoryRepository(new InMemoryChatMemoryRepository()).build();
+        var memoryAdvisor = this.memory.computeIfAbsent(user, x -> PromptChatMemoryAdvisor.builder(chatMemory).build());
         return this.ai
                 .prompt()
-                .system(systemPrompt)
                 .advisors(memoryAdvisor)
                 .user(question)
                 .call()
