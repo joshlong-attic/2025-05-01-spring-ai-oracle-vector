@@ -1,9 +1,10 @@
 package com.example.oracle;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.AbstractChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.PromptChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
-import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.memory.jdbc.JdbcChatMemoryRepository;
 import org.springframework.ai.document.Document;
@@ -24,39 +25,38 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.sql.DataSource;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @SpringBootApplication
 public class OracleApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(OracleApplication.class, args);
-    }
-//
-//    @Bean
-//    JdbcChatMemoryRepository jdbcChatMemoryRepository(DataSource dataSource) {
-//        return JdbcChatMemoryRepository
-//                .builder()
-//                .jdbcTemplate(new JdbcTemplate(dataSource))
-//                .build();
-//    }
+	public static void main(String[] args) {
+		SpringApplication.run(OracleApplication.class, args);
+	}
 
-    //@Bean
-    ApplicationRunner dogumentInitializer(JdbcClient db, VectorStore vectorStore, DogRepository repository) {
-        return args -> {
+	@Bean
+	MessageWindowChatMemory jdbcChatMemory(JdbcChatMemoryRepository chatMemoryRepository) {
+		return MessageWindowChatMemory.builder().chatMemoryRepository(chatMemoryRepository).build();
+	}
 
-            if (db.sql("select count(*) from SPRING_AI_VECTORS").query(Integer.class).single() != 0)
-                return;
+	@Bean
+	JdbcChatMemoryRepository jdbcChatMemoryRepository(DataSource dataSource) {
+		return JdbcChatMemoryRepository.builder().jdbcTemplate(new JdbcTemplate(dataSource)).build();
+	}
 
-            repository.findAll().forEach(dog -> {
-                var dogument = new Document("id: %s, name: %s,  description: %s".formatted(
-                        dog.id(), dog.name(), dog.description()
-                ));
-                vectorStore.add(List.of(dogument));
-            });
-        };
-    }
+	// @Bean
+	ApplicationRunner dogumentInitializer(JdbcClient db, VectorStore vectorStore, DogRepository repository) {
+		return args -> {
+
+			if (db.sql("select count(*) from SPRING_AI_VECTORS").query(Integer.class).single() != 0)
+				return;
+
+			repository.findAll().forEach(dog -> {
+				var dogument = new Document(
+						"id: %s, name: %s,  description: %s".formatted(dog.id(), dog.name(), dog.description()));
+				vectorStore.add(List.of(dogument));
+			});
+		};
+	}
 
 }
 
@@ -64,41 +64,38 @@ public class OracleApplication {
 @ResponseBody
 class DogAssistantController {
 
+	private final ChatClient ai;
 
-    private final Map<String, PromptChatMemoryAdvisor> memory = new ConcurrentHashMap<>();
+	private final PromptChatMemoryAdvisor memoryAdvisor;
 
-    private final ChatClient ai;
+	DogAssistantController(ChatClient.Builder ai, VectorStore vectorStore, ChatMemory chatMemory) {
+		this.memoryAdvisor = new PromptChatMemoryAdvisor(chatMemory);
+		var systemPrompt = """
+				You are an AI powered assistant to help people adopt a dog from the adoption\s
+				agency named Pooch Palace with locations in Antwerp, Seoul, Tokyo, Singapore, Paris,\s
+				Mumbai, New Delhi, Barcelona, San Francisco, and London. Information about the dogs available\s
+				will be presented below. If there is no information, then return a polite response suggesting we\s
+				don't have any dogs available.
+				""";
 
-    DogAssistantController(ChatClient.Builder ai, VectorStore vectorStore) {
-        var systemPrompt = """
-                You are an AI powered assistant to help people adopt a dog from the adoption\s
-                agency named Pooch Palace with locations in Antwerp, Seoul, Tokyo, Singapore, Paris,\s
-                Mumbai, New Delhi, Barcelona, San Francisco, and London. Information about the dogs available\s
-                will be presented below. If there is no information, then return a polite response suggesting we\s
-                don't have any dogs available.
-                """;
+		this.ai = ai.defaultSystem(systemPrompt).defaultAdvisors(new QuestionAnswerAdvisor(vectorStore)).build();
 
-        this.ai = ai
-                .defaultSystem(systemPrompt)
-                .defaultAdvisors(new QuestionAnswerAdvisor(vectorStore))
-                .build();
+	}
 
-    }
+	@PostMapping("/{user}/inquire")
+	String inquire(@PathVariable String user, @RequestParam String question) {
+		return this.ai.prompt()
+			.advisors(a -> a.advisors(this.memoryAdvisor)
+				.param(AbstractChatMemoryAdvisor.CHAT_MEMORY_CONVERSATION_ID_KEY, user))
+			.user(question)
+			.call()
+			.content();
+	}
 
-    @PostMapping("/{user}/inquire")
-    String inquire(@PathVariable String user, @RequestParam String question) {
-        var chatMemory = MessageWindowChatMemory.builder().chatMemoryRepository(new InMemoryChatMemoryRepository()).build();
-        var memoryAdvisor = this.memory.computeIfAbsent(user, x -> PromptChatMemoryAdvisor.builder(chatMemory).build());
-        return this.ai
-                .prompt()
-                .advisors(memoryAdvisor)
-                .user(question)
-                .call()
-                .content();
-    }
 }
 
 interface DogRepository extends ListCrudRepository<Dog, Integer> {
+
 }
 
 record Dog(@Id int id, String name, String owner, String description) {
