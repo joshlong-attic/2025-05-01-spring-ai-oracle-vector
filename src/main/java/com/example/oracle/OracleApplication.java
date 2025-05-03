@@ -75,9 +75,11 @@ class DogAssistantController {
 				don't have any dogs available.
 				""";
 
+		var ragAdvisor = new QuestionAnswerAdvisor(vectorStore);
+		var memoryAdvisor = new PromptChatMemoryAdvisor(chatMemory);
 		this.ai = ai//
 			.defaultSystem(systemPrompt) //
-			.defaultAdvisors(new QuestionAnswerAdvisor(vectorStore), new PromptChatMemoryAdvisor(chatMemory))//
+			.defaultAdvisors(ragAdvisor, memoryAdvisor)//
 			.build();
 
 	}
