@@ -18,4 +18,4 @@ CREATE TABLE ai_chat_memory
 );
 
 CREATE INDEX ai_chat_memory_conversation_id_timestamp_idx
-    ON ai_chat_memory(conversation_id, "timestamp")
+    ON ai_chat_memory(conversation_id, "timestamp");
